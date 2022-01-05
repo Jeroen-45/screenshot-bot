@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "screenshotbot",
+  "version": "${version}",
+
+  "name": "Screenshot Bot",
+  "description": "A mod to aid automating the screenshotting specific locations on specific servers",
+  "authors": [
+    "Jeroen45"
+  ],
+  "contact": {
+    "homepage": "",
+    "sources": "https://github.com/Jeroen-45/screenshot-bot"
+  },
+
+  "license": "MIT",
+  "icon": "assets/modid/icon.png",
+
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "nl.j45.screenshot.bot.ScreenshotBot"
+    ]
+  },
+  "mixins": [
+    "screenshotbot.mixins.json"
+  ],
+
+  "depends": {
+    "fabricloader": ">=0.11.3",
+    "fabric": "*",
+    "minecraft": "1.18.x",
+    "java": ">=17"
+  },
+  "suggests": {
+    "another-mod": "*"
+  }
+}
