@@ -17,6 +17,8 @@ import net.minecraft.client.gl.Framebuffer;
 import java.util.function.Consumer;
 import net.minecraft.text.Text;
 
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
+
 
 public class ScreenshotBot implements ModInitializer {
 	// This logger is used to write text to the console and the log file.
@@ -24,6 +26,7 @@ public class ScreenshotBot implements ModInitializer {
 	// That way, it's clear which mod wrote info, warnings, and errors.
 	public static final Logger LOGGER = LogManager.getLogger("screenshotbot");
 	private static MinecraftClient client = MinecraftClient.getInstance();
+	private int chunksLoaded = 0;
 
 	@Override
 	public void onInitialize() {
@@ -32,6 +35,26 @@ public class ScreenshotBot implements ModInitializer {
 		// Proceed with mild caution.
 
 		LOGGER.info("Hello Fabric world!");
+
+		ClientChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
+			this.chunksLoaded++;
+			LOGGER.info("Chunk loaded");
+
+			LOGGER.info(this.chunksLoaded);
+			LOGGER.info(client.worldRenderer.getCompletedChunkCount());
+
+			final int renderDistance = client.options.viewDistance;
+			final int targetChunksLoaded = (int)Math.pow(renderDistance * 2 + 1, 2);
+
+			if (this.chunksLoaded == targetChunksLoaded) {
+				LOGGER.info("All chunks loaded");
+			}
+		});
+		ClientChunkEvents.CHUNK_UNLOAD.register((world, chunk) -> {
+			this.chunksLoaded--;
+			LOGGER.info("Chunk unloaded");
+			LOGGER.info(this.chunksLoaded);
+		});
 	}
 
 	public static void serverConnect(String addr) {
@@ -43,8 +66,19 @@ public class ScreenshotBot implements ModInitializer {
 		LOGGER.info(value);
 	};
 
+	/* Hide the HUD, then take a screenshot and store it with the given filename,
+	 * then return the HUD to its previous state. */
 	public static void takeScreenshot(String filename) {
+		final boolean oldHudHidden = client.options.hudHidden;
+		client.options.hudHidden = true;
+
 		final Framebuffer framebuffer = client.getFramebuffer();
 		ScreenshotRecorder.saveScreenshot(client.runDirectory, filename, framebuffer, simpleLogConsumer);
+
+		client.options.hudHidden = oldHudHidden;
+	}
+
+	public static void runClientCommand(String command) {
+		client.player.sendChatMessage(command);
 	}
 }
