@@ -11,8 +11,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class ExampleMixin {
 	@Inject(at = @At("HEAD"), method = "init()V")
 	private void init(CallbackInfo info) {
-		ScreenshotBot.LOGGER.info("This line is printed by an example mod mixin!");
-		// ScreenshotBot.takeScreenshot("TESTTT.png");
-		// ScreenshotBot.serverConnect("192.168.1.212");
+		ScreenshotBot.LOGGER.info("Title screen loaded!");
 	}
 }
