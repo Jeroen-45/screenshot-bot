@@ -1,10 +1,11 @@
 package nl.j45.screenshot.bot;
 
+import nl.j45.screenshot.bot.ScreenshotBotComm;
+import nl.j45.screenshot.bot.ScreenshotBotCommEvents;
+
 import net.fabricmc.api.ModInitializer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import java.util.Timer;
-import java.util.TimerTask;
 
 import net.minecraft.client.MinecraftClient;
 
@@ -22,17 +23,21 @@ import net.minecraft.text.Text;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
 
 
-public class ScreenshotBot extends TimerTask implements ModInitializer {
+public class ScreenshotBot implements ModInitializer {
 	public static final Logger LOGGER = LogManager.getLogger("screenshotbot");
-	private static final Timer timer = new Timer();
 	private static MinecraftClient client = MinecraftClient.getInstance();
 
 	private long lastChunkLoadTime = 0L;
 	private long maxChunkLoadDuration = 0L;
 	private String pendingScreenshotFilename = null;
 
+	private ScreenshotBotComm comm;
+
 	@Override
 	public void onInitialize() {
+		this.comm = new ScreenshotBotComm(4000);
+		this.comm.start();
+
 		ClientChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
 			/* Update chunk loading time info upon each chunk load */
 			long chunkLoadDuration = System.nanoTime() - this.lastChunkLoadTime;
@@ -40,6 +45,17 @@ public class ScreenshotBot extends TimerTask implements ModInitializer {
 				this.maxChunkLoadDuration = chunkLoadDuration;
 			}
 			this.lastChunkLoadTime = System.nanoTime();
+		});
+
+		ScreenshotBotCommEvents.COMM_MESSAGE.register((message) -> {
+			/* Handle command through socket */
+			if (message.startsWith("/")) {
+				runClientCommand(message);
+			} else if (message.startsWith("connect ")) {
+				serverConnect(message.split("\\s")[1]);
+			} else if (message.startsWith("screenshot ")) {
+				this.takeScreenshotAwaitChunkloading(message.split("\\s")[1]);
+			}
 		});
 	}
 
@@ -50,12 +66,7 @@ public class ScreenshotBot extends TimerTask implements ModInitializer {
 		}
 
 		this.pendingScreenshotFilename = filename;
-		takeScreenshotAwaitChunkloading(true);
-	}
-
-	public void run() {
-		/* TimerTask run to check for chunk loading to be done after waiting */
-		this.takeScreenshotAwaitChunkloading(false);
+		this.takeScreenshotAwaitChunkloading(true);
 	}
 
 	public void takeScreenshotAwaitChunkloading(boolean reset) {
@@ -71,20 +82,29 @@ public class ScreenshotBot extends TimerTask implements ModInitializer {
 		if (chunksLoaded >= targetChunksLoaded
 				&& System.nanoTime() - this.lastChunkLoadTime >= this.maxChunkLoadDuration * 2
 				&& client.worldRenderer.isTerrainRenderComplete()) {
-			/* No new chunks were loaded for at least twice the highest time
+			/* No new chunks were loaded for at least the highest time
 			 * between chunk loads, at least half the chunks that should be
 			 * loaded based on the render distance are actually loaded,
 			 * and no chunks are currently being rendered.
 			 * We assume chunk loading activity is done, take the screenshot. */
+			this.comm.sendMessage("Chunks loaded");
 			takeScreenshot(this.pendingScreenshotFilename);
+			this.comm.sendMessage("Screenshot taken");
 			this.pendingScreenshotFilename = null;
 		} else {
-			/* Chunk loading isn't finished, wait again. */
-			long waitTime = (this.maxChunkLoadDuration * 2) / 1000000;
+			/* Chunk loading isn't finished, wait and check again later. */
+			long waitTime = this.maxChunkLoadDuration / 1000000;
 			if (waitTime == 0) {
 				waitTime = 250L;
 			}
-			timer.schedule(this, waitTime);
+			LOGGER.info("WaitTime until next chunk load check: " + waitTime + "ms");
+
+			try {
+				Thread.sleep(waitTime);
+			} catch (InterruptedException e) {
+				LOGGER.error("Thread interrupted while waiting for next chunk load check");
+			}
+			this.takeScreenshotAwaitChunkloading(false);
 		}
 	}
 
@@ -92,24 +112,22 @@ public class ScreenshotBot extends TimerTask implements ModInitializer {
 		LOGGER.info(value);
 	};
 
-	/* Hide the HUD, then take a screenshot and store it with the given filename,
-	 * then return the HUD to its previous state. */
+	/* Hide the HUD, then take a screenshot and store it with the given filename. */
 	public static void takeScreenshot(String filename) {
-		boolean oldHudHidden = client.options.hudHidden;
 		client.options.hudHidden = true;
 
 		Framebuffer framebuffer = client.getFramebuffer();
 		ScreenshotRecorder.saveScreenshot(client.runDirectory, filename, framebuffer, simpleLogConsumer);
-
-		client.options.hudHidden = oldHudHidden;
 	}
 
 	/* Connect to the server at the given address. */
 	public static void serverConnect(String address) {
-		MultiplayerScreen mpScreen = new MultiplayerScreen(new TitleScreen());
-		ServerAddress serverAddress = ServerAddress.parse(address);
-		ServerInfo server = new ServerInfo("", address, true);
-		ConnectScreen.connect(mpScreen, client, serverAddress, server);
+		client.execute(() -> {
+			MultiplayerScreen mpScreen = new MultiplayerScreen(new TitleScreen());
+			ServerAddress serverAddress = ServerAddress.parse(address);
+			ServerInfo server = new ServerInfo("", address, true);
+			ConnectScreen.connect(mpScreen, client, serverAddress, server);
+		});
 	}
 
 	/* Run the given command as if it were input in the client chat. */
