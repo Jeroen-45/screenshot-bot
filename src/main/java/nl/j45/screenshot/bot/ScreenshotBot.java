@@ -6,6 +6,8 @@ import org.apache.logging.log4j.Logger;
 
 import net.minecraft.client.MinecraftClient;
 
+import net.minecraft.network.packet.s2c.play.DisconnectS2CPacket;
+import net.minecraft.text.LiteralText;
 import net.minecraft.client.gui.screen.ConnectScreen;
 import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
 import net.minecraft.client.gui.screen.TitleScreen;
@@ -50,6 +52,8 @@ public class ScreenshotBot implements ModInitializer {
 				runClientCommand(message);
 			} else if (message.startsWith("connect ")) {
 				serverConnect(message.split("\\s")[1]);
+			} else if (message.startsWith("disconnect")) {
+				serverDisconnect();
 			} else if (message.startsWith("screenshot ")) {
 				this.takeScreenshotAwaitChunkloading(message.split("\\s")[1]);
 			}
@@ -119,10 +123,21 @@ public class ScreenshotBot implements ModInitializer {
 	/* Connect to the server at the given address. */
 	public static void serverConnect(String address) {
 		client.execute(() -> {
+			serverDisconnect();
 			MultiplayerScreen mpScreen = new MultiplayerScreen(new TitleScreen());
 			ServerAddress serverAddress = ServerAddress.parse(address);
 			ServerInfo server = new ServerInfo("", address, true);
 			ConnectScreen.connect(mpScreen, client, serverAddress, server);
+		});
+	}
+
+	/* If connected to a server, disconnect */
+	public static void serverDisconnect() {
+		client.execute(() -> {
+			if (client.getNetworkHandler() != null) {
+				/* Still connected to a server, disconnect first */
+				client.getNetworkHandler().onDisconnect(new DisconnectS2CPacket(new LiteralText("Disconnected by ScreenshotBot")));
+			}
 		});
 	}
 
