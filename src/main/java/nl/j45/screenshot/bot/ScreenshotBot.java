@@ -1,8 +1,5 @@
 package nl.j45.screenshot.bot;
 
-import nl.j45.screenshot.bot.ScreenshotBotComm;
-import nl.j45.screenshot.bot.ScreenshotBotCommEvents;
-
 import net.fabricmc.api.ModInitializer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -97,7 +94,6 @@ public class ScreenshotBot implements ModInitializer {
 			if (waitTime == 0) {
 				waitTime = 250L;
 			}
-			LOGGER.info("WaitTime until next chunk load check: " + waitTime + "ms");
 
 			try {
 				Thread.sleep(waitTime);

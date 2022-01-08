@@ -1,7 +1,5 @@
 package nl.j45.screenshot.bot;
 
-import nl.j45.screenshot.bot.ScreenshotBotCommEvents;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
